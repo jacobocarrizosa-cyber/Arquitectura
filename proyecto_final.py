@@ -1,10 +1,10 @@
 import tkinter as tk
 import re
 
-class VonNeumannSimV5:
+class VonNeumannSimV6:
     def __init__(self, root):
         self.root = root
-        self.root.title("Simulador CPU Von Neumann v5.0 (Sintaxis & Flags)")
+        self.root.title("Simulador CPU Von Neumann v6.0 (Turing-Complete)")
         self.root.geometry("1150x660")
         self.root.configure(bg="#f0f2f5")
 
@@ -15,8 +15,8 @@ class VonNeumannSimV5:
         self.IR = ""
         self.AC = 0
         self.ALU = "---"
-        self.FLAG_Z = False # Bandera Cero
-        self.FLAG_N = False # Bandera Negativo
+        self.FLAG_Z = False 
+        self.FLAG_N = False 
         self.memory = [""] * 16
 
         self.cycle_state = 0 
@@ -28,53 +28,45 @@ class VonNeumannSimV5:
 
         self.create_widgets()
         
-        # Programa por defecto
-        default_program = """LOAD DATO1
-SUB DATO2
-JUMP SALTAR
-HALT
-SALTAR: SUB DATO2
-STORE RES
-HALT
-DATO1: 8
-DATO2: 8
-RES: 0"""
+        # PROGRAMA POR DEFECTO: Un bucle "while" que descuenta de 3 a 0
+        default_program = """LOAD INICIO
+LOOP: SUB DECR
+JZ FIN
+JUMP LOOP
+FIN: HALT
+INICIO: 3
+DECR: 1"""
         self.code_text.insert("1.0", default_program)
         self.highlight_syntax()
         self.load_code_to_ram()
 
     def create_widgets(self):
-        title = tk.Label(self.root, text="💻 Simulador Von Neumann - V5.0", font=("Arial", 16, "bold"), bg="#f0f2f5", fg="#1e293b")
+        title = tk.Label(self.root, text="💻 Simulador Von Neumann V6.0 - Saltos Condicionales", font=("Arial", 16, "bold"), bg="#f0f2f5", fg="#1e293b")
         title.pack(pady=10)
 
         main_frame = tk.Frame(self.root, bg="#f0f2f5")
         main_frame.pack(fill="both", expand=True, padx=10)
 
-        # ================= COLUMNA 1: EDITOR PROFESIONAL =================
+        # ================= COLUMNA 1: EDITOR =================
         editor_frame = tk.LabelFrame(main_frame, text=" Editor de Código ", font=("Arial", 10, "bold"), bg="white", padx=10, pady=10)
         editor_frame.pack(side="left", fill="y", padx=5)
 
-        tk.Label(editor_frame, text="Sintaxis resaltada en tiempo real", font=("Arial", 8, "italic"), bg="white", fg="#64748b", justify="left").pack(anchor="w", pady=(0, 5))
+        tk.Label(editor_frame, text="Nuevos comandos: JZ, JN", font=("Arial", 8, "italic"), bg="white", fg="#64748b", justify="left").pack(anchor="w", pady=(0, 5))
         
-        # Contenedor para números de línea y editor
         text_container = tk.Frame(editor_frame, bg="white", bd=1, relief="solid")
         text_container.pack(fill="both", expand=True, pady=5)
 
-        # Barra lateral de números de línea
         self.line_numbers = tk.Text(text_container, width=3, bg="#e2e8f0", fg="#64748b", font=("Consolas", 11), state="disabled", bd=0, padx=3)
         self.line_numbers.pack(side="left", fill="y")
         self.update_line_numbers()
 
-        # Editor principal
         self.code_text = tk.Text(text_container, font=("Consolas", 11), width=18, bg="#f8fafc", fg="#0f172a", bd=0, insertbackground="black")
         self.code_text.pack(side="left", fill="both", expand=True)
         
-        # Configuración de Tags de Color para el Sintaxis
-        self.code_text.tag_config("keyword", foreground="#2563eb", font=("Consolas", 11, "bold")) # Azul
-        self.code_text.tag_config("label", foreground="#059669", font=("Consolas", 11, "italic")) # Verde
-        self.code_text.tag_config("number", foreground="#9333ea") # Púrpura
+        self.code_text.tag_config("keyword", foreground="#2563eb", font=("Consolas", 11, "bold")) 
+        self.code_text.tag_config("label", foreground="#059669", font=("Consolas", 11, "italic")) 
+        self.code_text.tag_config("number", foreground="#9333ea") 
 
-        # Bindings para actualizar colores al escribir
         self.code_text.bind("<KeyRelease>", self.highlight_syntax)
 
         tk.Button(editor_frame, text="⚙️ Ensamblar a RAM", font=("Arial", 10, "bold"), bg="#0ea5e9", fg="white", command=self.load_code_to_ram).pack(fill="x", pady=(5,0))
@@ -83,7 +75,6 @@ RES: 0"""
         cpu_frame = tk.LabelFrame(main_frame, text=" CPU ", font=("Arial", 10, "bold"), bg="white", padx=10, pady=10)
         cpu_frame.pack(side="left", fill="both", expand=True, padx=5)
 
-        # Panel de Banderas (LEDs)
         flags_container = tk.Frame(cpu_frame, bg="white")
         flags_container.pack(fill="x", pady=(0, 10))
         tk.Label(flags_container, text="Flags:", font=("Arial", 9, "bold"), bg="white").pack(side="left")
@@ -122,7 +113,7 @@ RES: 0"""
         self.bus_canvas.create_text(60, 150, text="Bus de Datos", font=("Arial", 8, "bold"), fill="#64748b")
         self.bus_data = self.bus_canvas.create_line(10, 170, 110, 170, width=5, fill="#cbd5e1", arrow=tk.BOTH)
 
-        # ================= COLUMNA 4: RAM Y VISTAS =================
+        # ================= COLUMNA 4: RAM =================
         right_frame = tk.Frame(main_frame, bg="#f0f2f5")
         right_frame.pack(side="left", fill="both", padx=5)
 
@@ -156,31 +147,24 @@ RES: 0"""
         self.btn_pause = tk.Button(btn_frame, text="⏸️ Pausa", font=("Arial", 10, "bold"), bg="#f59e0b", fg="white", command=self.pause_sim, state="disabled", width=8)
         self.btn_pause.pack(side="left", padx=5)
         self.speed_slider = tk.Scale(btn_frame, from_=0.2, to_=2.5, resolution=0.1, orient="horizontal", label="Velocidad (Seg)", bg="#f0f2f5", font=("Arial", 8))
-        self.speed_slider.set(1.0)
+        self.speed_slider.set(0.8)
         self.speed_slider.pack(side="left", padx=15)
         self.btn_step = tk.Button(btn_frame, text="Siguiente Paso ⏭️", font=("Arial", 10, "bold"), bg="#3b82f6", fg="white", command=self.step_cycle, padx=10)
         self.btn_step.pack(side="left", padx=15)
         tk.Button(btn_frame, text="Reiniciar 🔄", font=("Arial", 10), bg="#ef4444", fg="white", command=self.reset_sim, padx=10).pack(side="right", padx=20)
 
-    # --- FUNCIONES DE EDITOR VISUAL ---
     def update_line_numbers(self):
-        """Genera rígidamente los números 00 a 15 en la barra lateral."""
         self.line_numbers.config(state="normal")
         self.line_numbers.delete("1.0", tk.END)
-        for i in range(16):
-            self.line_numbers.insert(tk.END, f"{i:02d}\n")
+        for i in range(16): self.line_numbers.insert(tk.END, f"{i:02d}\n")
         self.line_numbers.config(state="disabled")
 
     def highlight_syntax(self, event=None):
-        """Aplica colores a palabras clave, etiquetas y números."""
-        # Limpiar tags previos
-        for tag in ["keyword", "label", "number"]:
-            self.code_text.tag_remove(tag, "1.0", tk.END)
-
+        for tag in ["keyword", "label", "number"]: self.code_text.tag_remove(tag, "1.0", tk.END)
         content = self.code_text.get("1.0", tk.END)
         
-        # Resaltar Palabras Clave
-        keywords = ["LOAD", "STORE", "ADD", "SUB", "JUMP", "HALT"]
+        # Añadidos JZ y JN a las palabras clave
+        keywords = ["LOAD", "STORE", "ADD", "SUB", "JUMP", "JZ", "JN", "HALT"]
         for kw in keywords:
             start_idx = "1.0"
             while True:
@@ -190,33 +174,28 @@ RES: 0"""
                 self.code_text.tag_add("keyword", start_idx, end_idx)
                 start_idx = end_idx
 
-        # Resaltar Etiquetas (Palabras que terminan en ':')
+        # Etiquetas
         start_idx = "1.0"
         while True:
             start_idx = self.code_text.search(r"^\s*[A-Za-z0-9_]+:", start_idx, tk.END, regexp=True)
             if not start_idx: break
-            # Encontrar el fin de la etiqueta
             line_text = self.code_text.get(start_idx, f"{start_idx} lineend")
             match_len = len(line_text.split(":")[0]) + 1
-            end_idx = f"{start_idx}+{match_len}c"
-            self.code_text.tag_add("label", start_idx, end_idx)
-            start_idx = end_idx
+            self.code_text.tag_add("label", start_idx, f"{start_idx}+{match_len}c")
+            start_idx = f"{start_idx}+{match_len}c"
 
-        # Resaltar Números sueltos
+        # Números
         start_idx = "1.0"
         while True:
             start_idx = self.code_text.search(r"\b\d+\b", start_idx, tk.END, regexp=True)
             if not start_idx: break
-            # Obtener longitud del número
             match = re.match(r"\d+", self.code_text.get(start_idx, f"{start_idx} wordend"))
             if match:
                 end_idx = f"{start_idx}+{len(match.group())}c"
                 self.code_text.tag_add("number", start_idx, end_idx)
                 start_idx = end_idx
-            else:
-                start_idx = f"{start_idx}+1c"
+            else: start_idx = f"{start_idx}+1c"
 
-    # --- LOGICA DEL ENSAMBLADOR ---
     def load_code_to_ram(self):
         raw_lines = self.code_text.get("1.0", tk.END).strip().split("\n")
         self.memory = [""] * 16
@@ -240,13 +219,13 @@ RES: 0"""
         for i in range(min(16, len(clean_lines))):
             inst = clean_lines[i]
             parts = inst.split()
+            # Ahora traduce etiquetas para JUMP, JZ y JN indistintamente
             if len(parts) == 2 and parts[1] in labels:
                 inst = f"{parts[0]} {labels[parts[1]]}" 
             self.memory[i] = inst
             
         self.reset_sim()
 
-    # --- FORMATO Y UI ---
     def format_num(self, val):
         try:
             num = int(val)
@@ -262,7 +241,6 @@ RES: 0"""
             return str(val)
 
     def check_flags(self):
-        """Actualiza el estado de las banderas lógicas tras usar la ALU."""
         self.FLAG_Z = (self.AC == 0)
         self.FLAG_N = (self.AC < 0)
 
@@ -274,9 +252,8 @@ RES: 0"""
         self.reg_labels["AC"].config(text=self.format_num(self.AC))
         self.alu_val_lbl.config(text=self.ALU)
 
-        # Actualizar visualización LED de las Banderas
-        self.led_z.config(bg="#22c55e" if self.FLAG_Z else "#fca5a5") # Verde si es Cero
-        self.led_n.config(bg="#ef4444" if self.FLAG_N else "#fca5a5") # Rojo Fuerte si es Negativo
+        self.led_z.config(bg="#22c55e" if self.FLAG_Z else "#fca5a5") 
+        self.led_n.config(bg="#ef4444" if self.FLAG_N else "#fca5a5") 
 
         for i in range(16):
             self.mem_val_labels[i].config(text=self.format_num(self.memory[i]), bg="#f8fafc")
@@ -323,12 +300,10 @@ RES: 0"""
         if self.cycle_state == 3: return
         self.reset_highlights()
 
-        if self.cycle_state == 0:
+        if self.cycle_state == 0: # FETCH
             self.status_lbl.config(text="FETCH (Buscando instrucción...)", fg="#b45309")
             self.MAR = self.PC
-            if self.MAR < 16:
-                self.MDR = self.memory[self.MAR]
-                self.mem_val_labels[self.MAR].config(bg="#fef3c7")
+            if self.MAR < 16: self.MDR = self.memory[self.MAR]
             else: self.MDR = "HALT"
             
             self.IR = self.MDR
@@ -338,7 +313,7 @@ RES: 0"""
             self.PC += 1
             self.cycle_state = 1
 
-        elif self.cycle_state == 1:
+        elif self.cycle_state == 1: # DECODE
             self.status_lbl.config(text="DECODE (Descifrando Comando)", fg="#1d4ed8")
             self.reg_labels["IR"].config(bg="#dbeafe")
             parts = self.IR.split()
@@ -347,11 +322,11 @@ RES: 0"""
             except ValueError: self.current_operand = None
             self.cycle_state = 2
 
-        elif self.cycle_state == 2:
+        elif self.cycle_state == 2: # EXECUTE
             self.status_lbl.config(text=f"EXECUTE ({self.current_opcode})", fg="#15803d")
             op, addr = self.current_opcode, self.current_operand
 
-            if op in ["LOAD", "ADD", "SUB"]:
+            if op in ["LOAD", "ADD", "SUB", "JZ", "JN", "JUMP"]:
                 self.bus_canvas.itemconfig(self.bus_address, fill="#10b981")
                 self.bus_canvas.itemconfig(self.bus_data, fill="#10b981")
             elif op == "STORE":
@@ -360,7 +335,7 @@ RES: 0"""
 
             if op == "LOAD":
                 self.AC = self.safe_get_mem(addr)
-                self.check_flags() # Se evalúan los flags al cargar
+                self.check_flags()
                 self.reg_labels["AC"].config(bg="#dcfce7")
                 if addr is not None and addr < 16: self.mem_val_labels[addr].config(bg="#dcfce7")
                 self.ALU = "---"
@@ -376,27 +351,46 @@ RES: 0"""
                 val = self.safe_get_mem(addr)
                 self.ALU = f"{self.AC} + {val}"
                 self.AC += val
-                self.check_flags() # Actualizar Flags tras operar
+                self.check_flags()
                 self.reg_labels["AC"].config(bg="#dcfce7")
                 self.alu_val_lbl.config(bg="#fecaca")
-                if addr is not None and addr < 16: self.mem_val_labels[addr].config(bg="#dcfce7")
 
             elif op == "SUB":
                 val = self.safe_get_mem(addr)
                 self.ALU = f"{self.AC} - {val}"
                 self.AC -= val
-                self.check_flags() # Actualizar Flags tras operar
+                self.check_flags()
                 self.reg_labels["AC"].config(bg="#dcfce7")
                 self.alu_val_lbl.config(bg="#fecaca") 
-                if addr is not None and addr < 16: self.mem_val_labels[addr].config(bg="#dcfce7")
 
             elif op == "JUMP":
                 if addr is not None and 0 <= addr < 16:
                     self.ALU = f"PC -> {addr}"
                     self.PC = addr
                     self.reg_labels["PC"].config(bg="#dcfce7")
-                    self.alu_val_lbl.config(bg="#fecaca")
                 else: self.ALU = "JUMP Error"
+
+            # ---- NUEVA LÓGICA: SALTO SI ES CERO ----
+            elif op == "JZ":
+                if self.FLAG_Z:
+                    if addr is not None and 0 <= addr < 16:
+                        self.ALU = f"Z=1: Salta a {addr}"
+                        self.PC = addr
+                        self.reg_labels["PC"].config(bg="#dcfce7")
+                    else: self.ALU = "JZ Error"
+                else:
+                    self.ALU = "Z=0: No salta"
+
+            # ---- NUEVA LÓGICA: SALTO SI ES NEGATIVO ----
+            elif op == "JN":
+                if self.FLAG_N:
+                    if addr is not None and 0 <= addr < 16:
+                        self.ALU = f"N=1: Salta a {addr}"
+                        self.PC = addr
+                        self.reg_labels["PC"].config(bg="#dcfce7")
+                    else: self.ALU = "JN Error"
+                else:
+                    self.ALU = "N=0: No salta"
 
             elif op == "HALT":
                 self.cycle_state = 3
@@ -413,7 +407,7 @@ RES: 0"""
         self.pause_sim()
         self.PC, self.MAR, self.AC = 0, 0, 0
         self.MDR, self.IR, self.ALU = "", "", "---"
-        self.FLAG_Z = True # 0 inicial activa bandera Zero
+        self.FLAG_Z = False
         self.FLAG_N = False
         self.cycle_state = 0
         self.status_lbl.config(text="Estado: LISTO", fg="#2563eb")
@@ -422,5 +416,5 @@ RES: 0"""
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = VonNeumannSimV5(root)
+    app = VonNeumannSimV6(root)
     root.mainloop()
