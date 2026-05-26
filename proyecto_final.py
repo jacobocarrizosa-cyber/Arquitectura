@@ -1,10 +1,10 @@
 import tkinter as tk
 import re
 
-class VonNeumannSimV6:
+class VonNeumannSimV7:
     def __init__(self, root):
         self.root = root
-        self.root.title("Simulador CPU Von Neumann v6.0 (Turing-Complete)")
+        self.root.title("Simulador CPU Von Neumann v7.0 (Operaciones Lógicas de Bits)")
         self.root.geometry("1150x660")
         self.root.configure(bg="#f0f2f5")
 
@@ -28,20 +28,29 @@ class VonNeumannSimV6:
 
         self.create_widgets()
         
-        # PROGRAMA POR DEFECTO: Un bucle "while" que descuenta de 3 a 0
-        default_program = """LOAD INICIO
-LOOP: SUB DECR
-JZ FIN
-JUMP LOOP
-FIN: HALT
-INICIO: 3
-DECR: 1"""
+        # PROGRAMA POR DEFECTO: Demuestra AND (Máscara), OR, XOR y NOT
+        default_program = """LOAD DATO1
+AND MASCARA
+STORE R_AND
+LOAD DATO1
+OR DATO2
+STORE R_OR
+LOAD DATO1
+XOR DATO2
+STORE R_XOR
+NOT
+STORE R_NOT
+HALT
+DATO1: 12
+DATO2: 5
+MASCARA: 14
+R_AND: 0"""
         self.code_text.insert("1.0", default_program)
         self.highlight_syntax()
         self.load_code_to_ram()
 
     def create_widgets(self):
-        title = tk.Label(self.root, text="💻 Simulador Von Neumann V6.0 - Saltos Condicionales", font=("Arial", 16, "bold"), bg="#f0f2f5", fg="#1e293b")
+        title = tk.Label(self.root, text="💻 Simulador Von Neumann V7.0 - ALU Lógica", font=("Arial", 16, "bold"), bg="#f0f2f5", fg="#1e293b")
         title.pack(pady=10)
 
         main_frame = tk.Frame(self.root, bg="#f0f2f5")
@@ -51,7 +60,7 @@ DECR: 1"""
         editor_frame = tk.LabelFrame(main_frame, text=" Editor de Código ", font=("Arial", 10, "bold"), bg="white", padx=10, pady=10)
         editor_frame.pack(side="left", fill="y", padx=5)
 
-        tk.Label(editor_frame, text="Nuevos comandos: JZ, JN", font=("Arial", 8, "italic"), bg="white", fg="#64748b", justify="left").pack(anchor="w", pady=(0, 5))
+        tk.Label(editor_frame, text="Nuevos comandos: AND, OR, XOR, NOT", font=("Arial", 8, "italic"), bg="white", fg="#64748b", justify="left").pack(anchor="w", pady=(0, 5))
         
         text_container = tk.Frame(editor_frame, bg="white", bd=1, relief="solid")
         text_container.pack(fill="both", expand=True, pady=5)
@@ -161,10 +170,9 @@ DECR: 1"""
 
     def highlight_syntax(self, event=None):
         for tag in ["keyword", "label", "number"]: self.code_text.tag_remove(tag, "1.0", tk.END)
-        content = self.code_text.get("1.0", tk.END)
         
-        # Añadidos JZ y JN a las palabras clave
-        keywords = ["LOAD", "STORE", "ADD", "SUB", "JUMP", "JZ", "JN", "HALT"]
+        # Añadidos AND, OR, XOR y NOT a las palabras clave
+        keywords = ["LOAD", "STORE", "ADD", "SUB", "JUMP", "JZ", "JN", "AND", "OR", "XOR", "NOT", "HALT"]
         for kw in keywords:
             start_idx = "1.0"
             while True:
@@ -219,7 +227,6 @@ DECR: 1"""
         for i in range(min(16, len(clean_lines))):
             inst = clean_lines[i]
             parts = inst.split()
-            # Ahora traduce etiquetas para JUMP, JZ y JN indistintamente
             if len(parts) == 2 and parts[1] in labels:
                 inst = f"{parts[0]} {labels[parts[1]]}" 
             self.memory[i] = inst
@@ -241,8 +248,11 @@ DECR: 1"""
             return str(val)
 
     def check_flags(self):
-        self.FLAG_Z = (self.AC == 0)
-        self.FLAG_N = (self.AC < 0)
+        # NOTA: En Python los números negativos son infinitos a la izquierda.
+        # Simulamos 8 bits aplicando una máscara antes de chequear el signo.
+        val_8bit = self.AC & 0xFF
+        self.FLAG_Z = (val_8bit == 0)
+        self.FLAG_N = (val_8bit & 0x80) != 0 # Verifica si el bit 7 está encendido
 
     def update_gui_values(self):
         self.reg_labels["PC"].config(text=self.format_num(self.PC))
@@ -326,7 +336,7 @@ DECR: 1"""
             self.status_lbl.config(text=f"EXECUTE ({self.current_opcode})", fg="#15803d")
             op, addr = self.current_opcode, self.current_operand
 
-            if op in ["LOAD", "ADD", "SUB", "JZ", "JN", "JUMP"]:
+            if op in ["LOAD", "ADD", "SUB", "JZ", "JN", "JUMP", "AND", "OR", "XOR"]:
                 self.bus_canvas.itemconfig(self.bus_address, fill="#10b981")
                 self.bus_canvas.itemconfig(self.bus_data, fill="#10b981")
             elif op == "STORE":
@@ -363,34 +373,54 @@ DECR: 1"""
                 self.reg_labels["AC"].config(bg="#dcfce7")
                 self.alu_val_lbl.config(bg="#fecaca") 
 
-            elif op == "JUMP":
-                if addr is not None and 0 <= addr < 16:
-                    self.ALU = f"PC -> {addr}"
-                    self.PC = addr
-                    self.reg_labels["PC"].config(bg="#dcfce7")
-                else: self.ALU = "JUMP Error"
+            # ---- NUEVAS OPERACIONES DE BITS ----
+            elif op == "AND":
+                val = self.safe_get_mem(addr)
+                self.ALU = f"{self.AC} AND {val}"
+                self.AC = self.AC & val
+                self.check_flags()
+                self.reg_labels["AC"].config(bg="#dcfce7")
+                self.alu_val_lbl.config(bg="#fecaca")
+                if addr is not None and addr < 16: self.mem_val_labels[addr].config(bg="#dcfce7")
 
-            # ---- NUEVA LÓGICA: SALTO SI ES CERO ----
-            elif op == "JZ":
-                if self.FLAG_Z:
+            elif op == "OR":
+                val = self.safe_get_mem(addr)
+                self.ALU = f"{self.AC} OR {val}"
+                self.AC = self.AC | val
+                self.check_flags()
+                self.reg_labels["AC"].config(bg="#dcfce7")
+                self.alu_val_lbl.config(bg="#fecaca")
+                if addr is not None and addr < 16: self.mem_val_labels[addr].config(bg="#dcfce7")
+
+            elif op == "XOR":
+                val = self.safe_get_mem(addr)
+                self.ALU = f"{self.AC} XOR {val}"
+                self.AC = self.AC ^ val
+                self.check_flags()
+                self.reg_labels["AC"].config(bg="#dcfce7")
+                self.alu_val_lbl.config(bg="#fecaca")
+                if addr is not None and addr < 16: self.mem_val_labels[addr].config(bg="#dcfce7")
+
+            elif op == "NOT":
+                # NOT no lee de RAM, solo invierte los bits del Acumulador.
+                # Aplicamos la inversión nativa a nivel de bits en Python (~)
+                self.ALU = f"NOT {self.AC}"
+                self.AC = ~self.AC
+                self.check_flags()
+                self.reg_labels["AC"].config(bg="#dcfce7")
+                self.alu_val_lbl.config(bg="#fecaca")
+
+            elif op in ["JUMP", "JZ", "JN"]:
+                do_jump = (op == "JUMP") or (op == "JZ" and self.FLAG_Z) or (op == "JN" and self.FLAG_N)
+                
+                if do_jump:
                     if addr is not None and 0 <= addr < 16:
-                        self.ALU = f"Z=1: Salta a {addr}"
+                        self.ALU = f"Salto a {addr}"
                         self.PC = addr
                         self.reg_labels["PC"].config(bg="#dcfce7")
-                    else: self.ALU = "JZ Error"
+                    else: self.ALU = f"{op} Error"
                 else:
-                    self.ALU = "Z=0: No salta"
-
-            # ---- NUEVA LÓGICA: SALTO SI ES NEGATIVO ----
-            elif op == "JN":
-                if self.FLAG_N:
-                    if addr is not None and 0 <= addr < 16:
-                        self.ALU = f"N=1: Salta a {addr}"
-                        self.PC = addr
-                        self.reg_labels["PC"].config(bg="#dcfce7")
-                    else: self.ALU = "JN Error"
-                else:
-                    self.ALU = "N=0: No salta"
+                    self.ALU = "No salta"
 
             elif op == "HALT":
                 self.cycle_state = 3
@@ -416,5 +446,5 @@ DECR: 1"""
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = VonNeumannSimV6(root)
+    app = VonNeumannSimV7(root)
     root.mainloop()
